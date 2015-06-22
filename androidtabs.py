@@ -22,17 +22,17 @@ Builder.load_string("""
 <AndroidTabsLabel>:
     padding: '12dp', 0
     halign: 'center'
-    text_normal_color: 1,1,1,.6
+    text_normal_color: 1, 1, 1, .6
     text_active_color: 1
 
 <AndroidTabsHeader>:
-    tab_indicator_color: 1,1,1,1
-    tab_indicator_height: '2dp'    
+    tab_indicator_color: 1, 1, 1, 1
+    tab_indicator_height: '2dp'
 """)
 
 
 class AndroidTabsException(Exception):
-    '''The AndroidTabsException class.'''
+    '''The AndroidTabsException class'''
     pass
 
 
@@ -52,7 +52,7 @@ class AndroidTabsLabel(ToggleButtonBehavior, Label):
     _panel = ObjectProperty(None)
     _androidtabs = ObjectProperty(None)
     _min_space = NumericProperty(0)
-    text_normal_color = VariableListProperty([1,1,1,.6])
+    text_normal_color = VariableListProperty([1, 1, 1, .6])
     text_active_color = VariableListProperty([1])
 
     def __init__(self, **kwargs):
@@ -64,8 +64,7 @@ class AndroidTabsLabel(ToggleButtonBehavior, Label):
         self.color = self.text_normal_color
         self.bind(
             x=self._update_tab_indicator,
-            width=self._update_tab_indicator,
-            )
+            width=self._update_tab_indicator)
 
     def on__panel(self, widget, panel):
 
@@ -117,7 +116,7 @@ class AndroidTabsHeaderContainer(FloatLayout):
 
     def __init__(self, **kwargs):
         super(AndroidTabsHeaderContainer, self).__init__(**kwargs)
-        
+
 
 class AndroidTabsHeader(BoxLayout):
 
@@ -129,19 +128,16 @@ class AndroidTabsHeader(BoxLayout):
         self._trigger_update_tabs = Clock.schedule_once(self._update_tabs, 0)
         super(AndroidTabsHeader, self).__init__(**kwargs)
         self._scrollview = ScrollView(
-            size_hint = (1, 1),
-            do_scroll_y = False,
-            bar_color = (0, 0, 0, 0),
-            effect_cls = ScrollEffect,
-            )
+            size_hint=(1, 1),
+            do_scroll_y=False,
+            bar_color=(0, 0, 0, 0),
+            effect_cls=ScrollEffect)
         self._layout = GridLayout(
             rows=1,
-            size_hint=(None, 1),
-            )
+            size_hint=(None, 1))
         self._layout.bind(
             minimum_width=self._layout.setter('width'),
-            width=self._trigger_update_tabs,
-            )
+            width=self._trigger_update_tabs)
         self._scrollview.add_widget(self._layout)
         self.add_widget(self._scrollview)
 
@@ -150,8 +146,7 @@ class AndroidTabsHeader(BoxLayout):
             Color(r, g, b, a)
             self._tab_indicator = Rectangle(
                 pos=(0, 0),
-                size=(0, self.tab_indicator_height)
-                )
+                size=(0, self.tab_indicator_height))
 
         self.bind(width=self._trigger_update_tabs)
 
@@ -190,15 +185,13 @@ class AndroidTabs(BoxLayout):
     _last_scroll_x = AliasProperty(
         get_last_scroll_x, None,
         bind=('_target_slide', ),
-        cache=True,
-        )
+        cache=True)
 
     default_tab = NumericProperty(0)
     anim_duration = NumericProperty(0.20)
     anim_threshold = BoundedNumericProperty(
         0.8, min=0.0, max=1.0,
-        errorhandler=lambda x: 0.0 if x < 0.0 else 1.0
-        )
+        errorhandler=lambda x: 0.0 if x < 0.0 else 1.0)
 
     header_height = NumericProperty('48dp')
 
@@ -211,15 +204,12 @@ class AndroidTabs(BoxLayout):
         self._carousel = Carousel(anim_move_duration=self.anim_duration)
         self._carousel.bind(
             index=self.on_index,
-            _offset=self.android_animation,
-            )
+            _offset=self.android_animation)
         self._header_container = AndroidTabsHeaderContainer(
-            size_hint=(1, None),
-            )
+            size_hint=(1, None))
         self._header = AndroidTabsHeader(
             size_hint=(1, None),
-            height=self.header_height,
-            )
+            height=self.header_height)
         self._header_container.add_widget(self._header)
         super(AndroidTabs, self).add_widget(self._carousel)
         super(AndroidTabs, self).add_widget(self._header_container)
@@ -245,13 +235,11 @@ class AndroidTabs(BoxLayout):
         if not issubclass(widget.__class__, AndroidTabsPanel):
 
             raise AndroidTabsException(
-                'AndroidTabs accept only subclass of AndroidTabsPanel'
-                )
+                'AndroidTabs accept only subclass of AndroidTabsPanel')
 
         new_tab = AndroidTabsLabel(
             _panel=widget,
-            _androidtabs=self,
-            )
+            _androidtabs=self)
 
         widget._tab = new_tab
         self._header._layout.add_widget(new_tab)
@@ -262,8 +250,7 @@ class AndroidTabs(BoxLayout):
         if not issubclass(widget.__class__, AndroidTabsPanel):
 
             raise AndroidTabsException(
-                'AndroidTabs can remove only subclass of AndroidTabsPanel'
-                )
+                'AndroidTabs can remove only subclass of AndroidTabsPanel')
 
         if widget.parent.parent is self._carousel:
 
@@ -336,8 +323,7 @@ class AndroidTabs(BoxLayout):
                     self._threshold_data = (
                         self._header._tab_indicator.size[0],
                         self._header._tab_indicator.pos[0],
-                        moving,
-                        )
+                        moving)
 
                 bar_width_peak, bar_pos_peak, breakpoint = self._threshold_data
 
