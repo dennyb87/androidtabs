@@ -1,4 +1,11 @@
 #!python
+
+"""
+AndroidTabs
+===========
+This widget try to reproduce the behaviour of Android Tabs.
+"""
+
 from kivy.app import App
 from kivy.lang import Builder
 from kivy.clock import Clock
@@ -36,18 +43,25 @@ class AndroidTabsException(Exception):
     pass
 
 
-class AndroidTabsPanel(Widget):
+class AndroidTabsPanelBase(Widget):
+    '''
+    AndroidTabsPanelBase is base class for panels.
+    '''
 
     label = StringProperty('')
     _tab = ObjectProperty(None)
 
 
-class Panel(ScrollView, AndroidTabsPanel):
+class Panel(ScrollView, AndroidTabsPanelBase):
 
     pass
 
 
 class AndroidTabsLabel(ToggleButtonBehavior, Label):
+
+    '''
+    AndroidTabsLabel it represent the label of each tab.
+    '''
 
     _panel = ObjectProperty(None)
     _androidtabs = ObjectProperty(None)
@@ -114,18 +128,30 @@ class AndroidTabsLabel(ToggleButtonBehavior, Label):
 
 class AndroidTabsHeaderContainer(FloatLayout):
 
-    def __init__(self, **kwargs):
-        super(AndroidTabsHeaderContainer, self).__init__(**kwargs)
+    '''
+    AndroidTabsHeaderContainer is the main container of the header.
+    It only serves to bring the header widget above all other widgets
+    just in case you want to add a shadow.
+    '''
+
+    pass
 
 
 class AndroidTabsHeader(BoxLayout):
+
+    '''
+    AndroidTabsHeader is just a boxlayout that contain
+    the scrollview for the tabs.
+    It is also responsible to show the tab indicator.
+    '''
 
     tab_indicator_height = NumericProperty('2dp')
     tab_indicator_color = VariableListProperty([1])
 
     def __init__(self, **kwargs):
 
-        self._trigger_update_tabs = Clock.schedule_once(self._update_tabs, 0)
+        self._trigger_update_tabs_width = Clock.schedule_once(
+            self._update_tabs_width, 0)
         super(AndroidTabsHeader, self).__init__(**kwargs)
         self._scrollview = ScrollView(
             size_hint=(1, 1),
@@ -137,7 +163,7 @@ class AndroidTabsHeader(BoxLayout):
             size_hint=(None, 1))
         self._layout.bind(
             minimum_width=self._layout.setter('width'),
-            width=self._trigger_update_tabs)
+            width=self._trigger_update_tabs_width)
         self._scrollview.add_widget(self._layout)
         self.add_widget(self._scrollview)
 
@@ -148,14 +174,14 @@ class AndroidTabsHeader(BoxLayout):
                 pos=(0, 0),
                 size=(0, self.tab_indicator_height))
 
-        self.bind(width=self._trigger_update_tabs)
+        self.bind(width=self._trigger_update_tabs_width)
 
     def _update_tab_indicator(self, x, w):
 
         self._tab_indicator.pos = (x, 0)
         self._tab_indicator.size = (w, self._tab_indicator.size[1])
 
-    def _update_tabs(self, *args, **kwargs):
+    def _update_tabs_width(self, *args, **kwargs):
 
         header, width, tabs = self, self.width, self._layout.children
         tabs_widths = [t._min_space for t in tabs if t._min_space]
@@ -173,6 +199,11 @@ class AndroidTabsHeader(BoxLayout):
 
 
 class AndroidTabs(BoxLayout):
+
+    '''
+    The AndroidTabs class.
+    You can use it to create your own custom tabbed panel.
+    '''
 
     _carousel = ObjectProperty(None)
     _header = ObjectProperty(None)
@@ -232,10 +263,10 @@ class AndroidTabs(BoxLayout):
 
     def add_widget(self, widget):
 
-        if not issubclass(widget.__class__, AndroidTabsPanel):
+        if not issubclass(widget.__class__, AndroidTabsPanelBase):
 
             raise AndroidTabsException(
-                'AndroidTabs accept only subclass of AndroidTabsPanel')
+                'AndroidTabs accept only subclass of AndroidTabsPanelBase')
 
         new_tab = AndroidTabsLabel(
             _panel=widget,
@@ -247,10 +278,10 @@ class AndroidTabs(BoxLayout):
 
     def remove_widget(self, widget):
 
-        if not issubclass(widget.__class__, AndroidTabsPanel):
+        if not issubclass(widget.__class__, AndroidTabsPanelBase):
 
             raise AndroidTabsException(
-                'AndroidTabs can remove only subclass of AndroidTabsPanel')
+                'AndroidTabs can remove only subclass of AndroidTabsPanelBase')
 
         if widget.parent.parent is self._carousel:
 
