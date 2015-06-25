@@ -416,6 +416,9 @@ Builder.load_string('''
             width: self.minimum_width
             on_width: root._trigger_update_tab_labels_width()
 
+<AndroidTabsHeader>:
+    size_hint: 1, None
+
 <AndroidTabs>:
     _tab_bar: tab_bar
     _carousel: carousel
@@ -432,7 +435,6 @@ Builder.load_string('''
             on_slides: root.on_index(self, root.default_tab)
 
     AndroidTabsHeader:
-        size_hint: 1, None
 
         AndroidTabsBar:
             id: tab_bar
@@ -481,7 +483,6 @@ kvdemo = '''
     Label:
         text: root.text
         color: 0,0,0,1
-        #on_press: root.parent.parent.parent.parent.remove_widget(root)
 '''
 
 
