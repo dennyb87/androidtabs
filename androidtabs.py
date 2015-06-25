@@ -3,7 +3,23 @@
 """
 AndroidTabs
 ===========
-This widget try to reproduce the behaviour of Android Tabs.
+AndroidTabs try to reproduce the behaviours of Android Tabs.
+It allow you to create your own custom tabbed panel
+with an animated tab indicator in a easy way.
+Just create your tabs that must inherit from AndroidTabsBase
+and add them to an AndroidTabs instance.
+
+class MyTab(BoxLayout, AndroidTabsBase):
+
+    pass
+
+android_tabs = AndroidTabs()
+
+for n in range(5):
+
+    tab = MyTab(text='Tab %s' % n)
+    tab.add_widget(Button(text='Button %s' % n))
+    android_tabs.add_widget(tab)
 """
 
 from kivy.app import App
@@ -18,24 +34,16 @@ from kivy.uix.carousel import Carousel
 from kivy.uix.button import Button
 from kivy.uix.widget import Widget
 from kivy.uix.scrollview import ScrollView
-from kivy.effects.scroll import ScrollEffect
 from kivy.graphics import Color, Rectangle
-from kivy.properties import ObjectProperty, NumericProperty
-from kivy.properties import VariableListProperty, StringProperty
-from kivy.properties import AliasProperty, BoundedNumericProperty
-
-
-Builder.load_string("""
-<AndroidTabsLabel>:
-    padding: '12dp', 0
-    halign: 'center'
-    text_normal_color: 1, 1, 1, .6
-    text_active_color: 1
-
-<AndroidTabsHeader>:
-    tab_indicator_color: 1, 1, 1, 1
-    tab_indicator_height: '2dp'
-""")
+from kivy.properties import (
+    ObjectProperty,
+    NumericProperty,
+    VariableListProperty,
+    StringProperty,
+    AliasProperty,
+    BoundedNumericProperty,
+    ReferenceListProperty
+)
 
 
 class AndroidTabsException(Exception):
@@ -43,55 +51,28 @@ class AndroidTabsException(Exception):
     pass
 
 
-class AndroidTabsPanelBase(Widget):
-    '''
-    AndroidTabsPanelBase is base class for panels.
-    '''
-
-    label = StringProperty('')
-    _tab = ObjectProperty(None)
-
-
-class Panel(ScrollView, AndroidTabsPanelBase):
-
-    pass
-
-
 class AndroidTabsLabel(ToggleButtonBehavior, Label):
-
     '''
     AndroidTabsLabel it represent the label of each tab.
     '''
 
-    _panel = ObjectProperty(None)
-    _androidtabs = ObjectProperty(None)
-    _min_space = NumericProperty(0)
-    text_normal_color = VariableListProperty([1, 1, 1, .6])
-    text_active_color = VariableListProperty([1])
+    text_color_normal = VariableListProperty([1, 1, 1, .6])
+    '''
+    Text color of the label when it is not selected.
+    '''
+
+    text_color_active = VariableListProperty([1])
+    '''
+    Text color of the label when it is selected.
+    '''
+
+    _tab = ObjectProperty(None)
+    _root = ObjectProperty(None)
 
     def __init__(self, **kwargs):
-        self._trigger_update_text = Clock.schedule_once(self._update_text, 0)
+
         super(AndroidTabsLabel, self).__init__(**kwargs)
-        self.allow_no_selection = False
-        self.group = 'tabs'
-        self.size_hint = (None, 1)
-        self.color = self.text_normal_color
-        self.bind(
-            x=self._update_tab_indicator,
-            width=self._update_tab_indicator)
-
-    def on__panel(self, widget, panel):
-
-        if panel:
-            panel.bind(label=self._trigger_update_text)
-        else:
-            panel.unbind(label=self._trigger_update_text)
-
-    def _update_text(self, *args):
-
-        if self._panel:
-
-            self.text = self._panel.label
+        self._min_space = 0
 
     def on_touch_down(self, touch):
         # only allow selecting the tab if not already selected
@@ -99,95 +80,93 @@ class AndroidTabsLabel(ToggleButtonBehavior, Label):
             return
         super(AndroidTabsLabel, self).on_touch_down(touch)
 
-    def on_release(self, *args):
-
+    def on_release(self):
+        # if the label is selected load the relative tab from carousel
         if self.state == 'down':
-
-            self._androidtabs._carousel.load_slide(self._panel)
+            self._root._carousel.load_slide(self._tab)
 
     def on_texture(self, widget, texture):
-
+        # just save the minimum width of the label based of the content
         if texture:
-
             self.width = texture.width
             self._min_space = self.width
 
-    def on_state(self, widget, state):
-
-        if state == 'down':
-            self.color = self.text_active_color
-        else:
-            self.color = self.text_normal_color
-
-    def _update_tab_indicator(self, *args):
-
-        if self is self._androidtabs._carousel.current_slide._tab:
-
-            self._androidtabs._header._update_tab_indicator(self.x, self.width)
+    def _update_tab_indicator(self):
+        # update the position and size of the board of the indicator
+        # when the label changes size or position
+        if self is self._root._carousel.current_slide._tab_label:
+            self._root._update_tab_indicator(self.x, self.width)
 
 
-class AndroidTabsHeaderContainer(FloatLayout):
+class AndroidTabsBase(Widget):
 
     '''
-    AndroidTabsHeaderContainer is the main container of the header.
-    It only serves to bring the header widget above all other widgets
-    just in case you want to add a shadow.
+    AndroidTabsBase allow you to create a tab.
+    You must create a new class that inherits
+    from AndroidTabsBase.
+    In this way you have total control over the
+    views of your tabbed panel.
     '''
 
-    pass
-
-
-class AndroidTabsHeader(BoxLayout):
-
+    text = StringProperty('')
     '''
-    AndroidTabsHeader is just a boxlayout that contain
-    the scrollview for the tabs.
-    It is also responsible to show the tab indicator.
+    It will be the label text of the tab.
     '''
 
-    tab_indicator_height = NumericProperty('2dp')
-    tab_indicator_color = VariableListProperty([1])
+    _tab_label = ObjectProperty(None)
+    '''
+    It is the label object reference of the tab.
+    '''
 
     def __init__(self, **kwargs):
 
-        self._trigger_update_tabs_width = Clock.schedule_once(
-            self._update_tabs_width, 0)
-        super(AndroidTabsHeader, self).__init__(**kwargs)
-        self._scrollview = ScrollView(
-            size_hint=(1, 1),
-            do_scroll_y=False,
-            bar_color=(0, 0, 0, 0),
-            effect_cls=ScrollEffect)
-        self._layout = GridLayout(
-            rows=1,
-            size_hint=(None, 1))
-        self._layout.bind(
-            minimum_width=self._layout.setter('width'),
-            width=self._trigger_update_tabs_width)
-        self._scrollview.add_widget(self._layout)
-        self.add_widget(self._scrollview)
+        self._tab_label = AndroidTabsLabel()
+        self._tab_label._tab = self
+        super(AndroidTabsBase, self).__init__(**kwargs)
 
-        with self._layout.canvas.after:
-            r, g, b, a = self.tab_indicator_color
-            Color(r, g, b, a)
-            self._tab_indicator = Rectangle(
-                pos=(0, 0),
-                size=(0, self.tab_indicator_height))
+    def on_text(self, widget, text):
+        # set the label text
+        self._tab_label.text = self.text
 
-        self.bind(width=self._trigger_update_tabs_width)
 
-    def _update_tab_indicator(self, x, w):
+class AndroidTabsMain(BoxLayout):
+    '''
+    AndroidTabsMain is just a boxlayout that contain
+    the carousel. It allows you to have control over the carousel.
+    '''
 
-        self._tab_indicator.pos = (x, 0)
-        self._tab_indicator.size = (w, self._tab_indicator.size[1])
 
-    def _update_tabs_width(self, *args, **kwargs):
+class AndroidTabsHeader(FloatLayout):
+    '''
+    AndroidTabsHeader contain the tab bar.
+    It only serves to bring the tab bar widget above all other widgets
+    just in case you want to add a shadow.
+    '''
+    pass
 
-        header, width, tabs = self, self.width, self._layout.children
+
+class AndroidTabsBar(BoxLayout):
+    '''
+    AndroidTabsBar is just a boxlayout that contain
+    the scrollview for the tabs.
+    It is also responsible to resize the tab label when it needed.
+    '''
+
+    def __init__(self, **kwargs):
+
+        self._trigger_update_tab_labels_width = Clock.schedule_once(
+            self._update_tab_labels_width, 0)
+        super(AndroidTabsBar, self).__init__(**kwargs)
+
+    def _update_tab_labels_width(self, *args, **kwargs):
+        # update width of the labels when it is needed
+        width, tabs = self.width, self._layout.children
         tabs_widths = [t._min_space for t in tabs if t._min_space]
         tabs_space = float(sum(tabs_widths))
+
         if not tabs_space:
             return
+
         ratio = width / tabs_space
         use_ratio = True in (width / len(tabs) < w for w in tabs_widths)
 
@@ -199,142 +178,168 @@ class AndroidTabsHeader(BoxLayout):
 
 
 class AndroidTabs(BoxLayout):
-
     '''
     The AndroidTabs class.
     You can use it to create your own custom tabbed panel.
     '''
 
-    _carousel = ObjectProperty(None)
-    _header = ObjectProperty(None)
-    _target_slide = ObjectProperty(None)
-
-    def get_last_scroll_x(self, *args):
-
-        return self._header._scrollview.scroll_x
-
-    _last_scroll_x = AliasProperty(
-        get_last_scroll_x, None,
-        bind=('_target_slide', ),
-        cache=True)
-
     default_tab = NumericProperty(0)
-    anim_duration = NumericProperty(0.20)
+    '''
+    Index of the default tab. Default to 0.
+    '''
+
+    tab_indicator_height = NumericProperty('2dp')
+    '''
+    Height of the tab indicator.
+    '''
+
+    tab_indicator_color = VariableListProperty([1])
+    '''
+    Color of the tab indicator.
+    '''
+
+    anim_duration = NumericProperty(0.2)
+    '''
+    Duration of the animation. Default to 0.2.
+    '''
+
     anim_threshold = BoundedNumericProperty(
         0.8, min=0.0, max=1.0,
         errorhandler=lambda x: 0.0 if x < 0.0 else 1.0)
+    '''
+    Animation threshold allow you to change the animation effect.
+    Default to 0.8.
+    '''
 
-    header_height = NumericProperty('48dp')
+    _target_tab = ObjectProperty(None)
+    '''
+    Is the carousel reference of the next tab / slide.
+    When you go from "Tab A" to "Tab B", "Tab B" will be the
+    target tab / slide of the carousel.
+    '''
+
+    def get_last_scroll_x(self):
+
+        return self._tab_bar._scrollview.scroll_x
+
+    _last_scroll_x = AliasProperty(
+        get_last_scroll_x, None,
+        bind=('_target_tab', ),
+        cache=True)
+    '''
+    It keep track of the last scroll_x value of the tab bar.
+    '''
 
     def __init__(self, **kwargs):
-
-        self.padding = (0, self.header_height, 0, 0)
         super(AndroidTabs, self).__init__(**kwargs)
-        self.orientation = 'vertical'
         self._threshold_data = ()
-        self._carousel = Carousel(anim_move_duration=self.anim_duration)
-        self._carousel.bind(
-            index=self.on_index,
-            _offset=self.android_animation)
-        self._header_container = AndroidTabsHeaderContainer(
-            size_hint=(1, None))
-        self._header = AndroidTabsHeader(
-            size_hint=(1, None),
-            height=self.header_height)
-        self._header_container.add_widget(self._header)
-        super(AndroidTabs, self).add_widget(self._carousel)
-        super(AndroidTabs, self).add_widget(self._header_container)
-        if self._carousel.slides:
-            self._carousel.index = self.default_tab
+        self._tab_indicator_builder()
 
-    def on_size(self, widget, size):
+    def _tab_indicator_builder(self):
+        # build tab indicator
+        self._tab_bar._layout.canvas.after.clear()
+        with self._tab_bar._layout.canvas.after:
+            r, g, b, a = self.tab_indicator_color
+            Color(r, g, b, a)
+            self._tab_indicator = Rectangle(
+                pos=(0, 0),
+                size=(0, self.tab_indicator_height))
 
-        if self._header:
-
-            self._header.y = self.top - self.header_height
+    def _update_tab_indicator(self, x, w):
+        # update position and size of the indicator
+        self._tab_indicator.pos = (x, 0)
+        self._tab_indicator.size = (w, self.tab_indicator_height)
 
     def on_index(self, carousel, index):
-
-        current_tab = carousel.current_slide._tab
-        if current_tab.state == 'normal':
-            current_tab._do_press()
+        # when the index of the carousel change, the changes are applied.
         self._threshold_data = ()
-        self._header._update_tab_indicator(current_tab.x, current_tab.width)
+        current_tab_label = carousel.current_slide._tab_label
+        if current_tab_label.state == 'normal':
+            current_tab_label._do_press()
+        self._update_tab_indicator(current_tab_label.x, current_tab_label.width)
 
     def add_widget(self, widget):
+        # You can add only subclass of AndroidTabsBase.
+        if len(self.children) >= 2:
 
-        if not issubclass(widget.__class__, AndroidTabsPanelBase):
+            if not issubclass(widget.__class__, AndroidTabsBase):
+                raise AndroidTabsException(
+                    'AndroidTabs accept only subclass of AndroidTabsBase')
 
-            raise AndroidTabsException(
-                'AndroidTabs accept only subclass of AndroidTabsPanelBase')
+            widget._tab_label._root = self
+            self._tab_bar._layout.add_widget(widget._tab_label)
+            self._carousel.add_widget(widget)
+            return
 
-        new_tab = AndroidTabsLabel(
-            _panel=widget,
-            _androidtabs=self)
-
-        widget._tab = new_tab
-        self._header._layout.add_widget(new_tab)
-        self._carousel.add_widget(widget)
+        return super(AndroidTabs, self).add_widget(widget)
 
     def remove_widget(self, widget):
-
-        if not issubclass(widget.__class__, AndroidTabsPanelBase):
+        # You can remove only subclass of AndroidTabsBase.
+        if not issubclass(widget.__class__, AndroidTabsBase):
 
             raise AndroidTabsException(
-                'AndroidTabs can remove only subclass of AndroidTabsPanelBase')
+                'AndroidTabs can remove only subclass of AndroidTabBase')
 
-        if widget.parent.parent is self._carousel:
+        if widget.parent.parent == self._carousel:
 
+            # remove tab label from the tab bar
+            self._tab_bar._layout.remove_widget(widget._tab_label)
+
+            # remove tab from carousel
             self._carousel.remove_widget(widget)
-            self._header._layout.remove_widget(widget._tab)
 
-    def auto_scroll(self, target, step):
-
+    def tab_bar_autoscroll(self, target, step):
+        # automatic scroll animation of the tab bar.
         t = target
-        bound_left = self._header.width / 2
-        bound_right = self._header._layout.width - bound_left
-        dt = t.center_x - (self._header.width / 2)
-        sx, sy = self._header._scrollview.convert_distance_to_scroll(dt, 0)
+        bound_left = self._tab_bar.width / 2
+        bound_right = self._tab_bar._layout.width - bound_left
+        dt = t.center_x - (self._tab_bar.width / 2)
+        sx, sy = self._tab_bar._scrollview.convert_distance_to_scroll(dt, 0)
 
+        # last scroll x of the tab bar
         lsx = self._last_scroll_x
+
+        # distance to run
         dst = abs(lsx - sx)
+
+        # determine scroll direction
         scroll_is_late = lsx < sx
 
         if scroll_is_late and t.center_x > bound_left:
-
             x = lsx + (dst * step)
-            self._header._scrollview.scroll_x = x if x < 1.0 else 1.0
+            self._tab_bar._scrollview.scroll_x = x if x < 1.0 else 1.0
 
         elif not scroll_is_late and t.center_x < bound_right:
-
             x = lsx - (dst * step)
-            self._header._scrollview.scroll_x = x if x > 0.0 else 0.0
+            self._tab_bar._scrollview.scroll_x = x if x > 0.0 else 0.0
 
     def android_animation(self, carousel, offset):
-
+        # try to reproduce the android animation effect.
         if offset != 0 and abs(offset) < self.width:
-
             forward = offset < 0
             offset = abs(offset)
             step = offset / float(carousel.width)
             moving = abs(offset - carousel.width)
 
+            if not moving:
+                return
+
             skip_slide = carousel.slides[carousel._skip_slide] \
                         if carousel._skip_slide is not None else False
             next_slide = carousel.next_slide \
                         if forward else carousel.previous_slide
-            self._target_slide = skip_slide if skip_slide \
+            self._target_tab = skip_slide if skip_slide \
                         else next_slide if next_slide is not None \
                         else carousel.current_slide
 
-            a = carousel.current_slide._tab
-            b = self._target_slide._tab
+            a = carousel.current_slide._tab_label
+            b = self._target_tab._tab_label
 
-            if self._target_slide is self._carousel.current_slide:
+            if self._target_tab is self._carousel.current_slide:
                 return
 
-            # Header automatic scroll animation
-            self.auto_scroll(b, step)
+            # tab bar automatic scroll animation
+            self.tab_bar_autoscroll(b, step)
 
             if step <= self.anim_threshold:
 
@@ -350,40 +355,153 @@ class AndroidTabs(BoxLayout):
 
             else:
 
+                # keep track of indicator data in the threshold
+                # to calculate the distance which is left to run
                 if not self._threshold_data:
                     self._threshold_data = (
-                        self._header._tab_indicator.size[0],
-                        self._header._tab_indicator.pos[0],
+                        self._tab_indicator.size[0],
+                        self._tab_indicator.pos[0],
                         moving)
 
-                bar_width_peak, bar_pos_peak, breakpoint = self._threshold_data
+                ind_width, ind_pos, breakpoint = self._threshold_data
 
                 step = 1.0 - (moving / breakpoint)
-                gap_w = bar_width_peak - b.width
-                w_step = bar_width_peak - (gap_w * step)
+                gap_w = ind_width - b.width
+                w_step = ind_width - (gap_w * step)
 
                 if forward:
                     x_step = a.x + abs((a.x - b.x)) * step
 
                 else:
-                    gap_x = bar_pos_peak - b.x
-                    x_step = bar_pos_peak - (gap_x * step)
+                    gap_x = ind_pos - b.x
+                    x_step = ind_pos - (gap_x * step)
 
-            self._header._update_tab_indicator(x_step, w_step)
+            # updates the indicator at the end of each step
+            self._update_tab_indicator(x_step, w_step)
+
+
+Builder.load_string('''
+#:import ScrollEffect kivy.effects.scroll.ScrollEffect
+<AndroidTabsLabel>:
+    allow_no_selection: False
+    group: 'tabs'
+    size_hint: None, 1
+    halign: 'center'
+    padding: '12dp', 0
+    text_color_normal: 1, 1, 1, .6
+    text_color_active: 1, 1, 1, 1
+    color: self.text_color_active if self.state is 'down' \
+                                else self.text_color_normal
+    on_x: self._update_tab_indicator()
+    on_width: self._update_tab_indicator()
+
+<AndroidTabsBar>:
+    _scrollview: scrollview
+    _layout: gridlayout
+    on_width: self._trigger_update_tab_labels_width()
+    size_hint: 1, None
+    height: '48dp'
+
+    ScrollView:
+        id: scrollview
+        size_hint: 1, 1
+        do_scroll_y: False
+        bar_color: 0, 0, 0, 0
+        effect_cls: ScrollEffect
+
+        GridLayout:
+            id: gridlayout
+            rows: 1
+            size_hint: None, 1
+            width: self.minimum_width
+            on_width: root._trigger_update_tab_labels_width()
+
+<AndroidTabs>:
+    _tab_bar: tab_bar
+    _carousel: carousel
+    orientation: 'vertical'
+    padding: 0, tab_bar.height, 0, 0
+
+    AndroidTabsMain:
+
+        Carousel:
+            id: carousel
+            anim_move_duration: root.anim_duration
+            on_index: root.on_index(*args)
+            on__offset: root.android_animation(*args)
+            on_slides: root.on_index(self, root.default_tab)
+
+    AndroidTabsHeader:
+        size_hint: 1, None
+
+        AndroidTabsBar:
+            id: tab_bar
+            y: root.top - self.height
+''')
+
+kvdemo = '''
+#:import hex_to_kvcolor kivy.utils.get_color_from_hex
+
+<AndroidTabsBar>:
+    height: '68dp'
+    canvas.before:
+        Color:
+            rgba: hex_to_kvcolor('#03A9F4')
+        Rectangle:
+            pos: self.pos
+            size: self.size
+        Color:
+            rgba: 0,0,0,.3
+        Rectangle:
+            pos: self.pos[0], self.pos[1] - 1
+            size: self.size[0], 1
+        Color:
+            rgba: 0,0,0,.2
+        Rectangle:
+            pos: self.pos[0], self.pos[1] - 2
+            size: self.size[0], 1
+        Color:
+            rgba: 0,0,0,.05
+        Rectangle:
+            pos: self.pos[0], self.pos[1] - 3
+            size: self.size[0], 1
+
+<AndroidTabs>:
+    MyTab:
+        text: 'TAB N 1'
+
+<MyTab>:
+    text: self.text
+    canvas:
+        Color:
+            rgba: 1,1,1,1
+        Rectangle:
+            pos: self.pos
+            size: self.size
+    Label:
+        text: root.text
+        color: 0,0,0,1
+        #on_press: root.parent.parent.parent.parent.remove_widget(root)
+'''
+
 
 if __name__ == '__main__':
+
+    class MyTab(BoxLayout, AndroidTabsBase):
+
+        pass
 
     class MainApp(App):
 
         def build(self):
 
+            Builder.load_string(kvdemo)
             android_tabs = AndroidTabs()
 
-            for n in range(1, 6):
+            for n in range(2, 6):
 
-                panel = Panel(label='Tab %s' % n)
-                panel.add_widget(Button(text='%s' % n))
-                android_tabs.add_widget(panel)
+                tab = MyTab(text='TAB N %s' % n)
+                android_tabs.add_widget(tab)
 
             return android_tabs
 
